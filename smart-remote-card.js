@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.4.0";
+const SMART_REMOTE_VERSION = "0.4.1";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -73,6 +73,7 @@ class SmartRemoteCard extends HTMLElement {
     return {
       title: "Smart Remote",
       source_attribute: "source",
+      power_mode: "display",
       theme: "system",
       show_source_selector: true,
       show_device_source_selector: true,
@@ -89,6 +90,7 @@ class SmartRemoteCard extends HTMLElement {
     this._config = Object.assign({
       title: "Smart Remote",
       source_attribute: "source",
+      power_mode: "display",
       theme: "system",
       show_source_selector: true,
       show_device_source_selector: true,
@@ -99,6 +101,9 @@ class SmartRemoteCard extends HTMLElement {
       fallback: { type: "webos", entity: "" },
     }, config);
     this._config.mappings = Array.isArray(config.mappings) ? config.mappings : [];
+    if (!config.power_mode) {
+      this._config.power_mode = config.power_entity && config.power_entity !== config.display_entity ? "helper" : "display";
+    }
     this.render();
   }
 
@@ -206,7 +211,10 @@ class SmartRemoteCard extends HTMLElement {
   }
 
   async _power() {
-    const entity = this._config.power_entity || this._config.display_entity;
+    const inferredMode = this._config.power_entity && this._config.power_entity !== this._config.display_entity ? "helper" : "display";
+    const mode = this._config.power_mode || inferredMode;
+    const entity = mode === "helper" ? this._config.power_entity : this._config.display_entity;
+    if (mode === "helper" && !entity) return this._toast("Choose a TV power helper / entity in the visual editor.");
     return this._togglePowerEntity(entity, "TV power");
   }
 
@@ -530,12 +538,18 @@ class SmartRemoteCardEditor extends HTMLElement {
         <div class="field full"><label>Display / TV entity</label><select data-root="display_entity">${this._entityOptions(c.display_entity,["media_player"])}</select></div>
         <div class="field"><label>Card title</label><input data-root="title" value="${esc(c.title || "")}"></div>
         <div class="field"><label>Source attribute</label><input data-root="source_attribute" value="${esc(c.source_attribute || "source")}"></div>
+        <div class="field full"><label>Power control</label><select data-root="power_mode">
+          <option value="display" ${(c.power_mode || ((!c.power_entity || c.power_entity === c.display_entity) ? "display" : "helper")) === "display" ? "selected" : ""}>Use Display / TV entity</option>
+          <option value="helper" ${(c.power_mode || ((!c.power_entity || c.power_entity === c.display_entity) ? "display" : "helper")) === "helper" ? "selected" : ""}>Use separate power helper / entity</option>
+        </select></div>
+        ${(c.power_mode || ((!c.power_entity || c.power_entity === c.display_entity) ? "display" : "helper")) === "helper"
+          ? `<div class="field full"><label>TV power helper / entity</label><select data-root="power_entity">${this._entityOptions(c.power_entity || "",["media_player","switch","input_boolean","remote"])}</select></div>`
+          : ""}
       </div>
 
       <h3>Global TV controls</h3>
-      <p class="help">Power and volume stay on these entities even when HDMI device routing changes.</p>
+      <p class="help">Volume stays on this entity even when HDMI device routing changes.</p>
       <div class="grid">
-        <div class="field full"><label>TV power helper / entity</label><select data-root="power_entity">${this._entityOptions(c.power_entity || c.display_entity,["media_player","switch","input_boolean","remote"])}</select></div>
         <div class="field full"><label>Volume entity</label><select data-root="volume_entity">${this._entityOptions(c.volume_entity || c.display_entity,["media_player","remote"])}</select></div>
         <div class="field"><label>Remote volume preset</label><select data-root="volume_remote_type">${["android_tv","totalplay","remote"].map(v=>`<option value="${v}" ${v === (c.volume_remote_type || "android_tv") ? "selected" : ""}>${PRESET_LABELS[v]}</option>`).join("")}</select></div>
       </div>
@@ -578,7 +592,7 @@ class SmartRemoteCardEditor extends HTMLElement {
       </div>
       <div class="version">Smart Remote Card v${SMART_REMOTE_VERSION}</div>`;
 
-    this.shadowRoot.querySelectorAll("[data-root]").forEach(el => el.addEventListener("change", e => { this._update([el.dataset.root], e.target.value); if (el.dataset.root === "display_entity") this.render(); }));
+    this.shadowRoot.querySelectorAll("[data-root]").forEach(el => el.addEventListener("change", e => { this._update([el.dataset.root], e.target.value); if (["display_entity","power_mode"].includes(el.dataset.root)) this.render(); }));
     this.shadowRoot.querySelectorAll("input[data-root]").forEach(el => el.addEventListener("input", e => this._update([el.dataset.root], e.target.value)));
     this.shadowRoot.querySelectorAll("[data-check]").forEach(el => el.addEventListener("change", e => this._update([el.dataset.check], e.target.checked)));
     this.shadowRoot.querySelectorAll(".mapping").forEach(box => {
