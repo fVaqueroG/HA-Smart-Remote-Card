@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.0 — 2026-09-25
+
+- Added an optional Apps / source entity to each mapped TV input.
+- Added automatic mapped-device source discovery from `media_player.source_list`.
+- Added a second in-card selector for Android TV apps or other mapped-device sources.
+- Device source selection uses `media_player.select_source`.
+- The selector is automatically hidden when the mapped entity has no available sources.
+- Added a visual-editor toggle for the mapped-device app/source selector.
+
+
 ## v0.2.0 — 2026-09-25
 
 - Added `custom:smart-remote-popup-card`.
