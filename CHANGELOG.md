@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.2 — 2026-09-25
+
+- Fixed the popup remote ignoring an existing TV power helper.
+- Fixed visual-editor power-mode defaults overriding a configured power helper.
+- Centralized power-mode normalization across the full card, popup card, and both editors.
+- Preserved backward compatibility for cards created before the explicit power-mode selector was added.
+
+
 ## v0.4.1 — 2026-09-25
 
 - Moved main TV power selection into the Display section.
