@@ -311,6 +311,36 @@ Supported action IDs include:
 
 `up`, `down`, `left`, `right`, `ok`, `back`, `home`, `menu`, `guide`, `info`, `play_pause`, `play`, `pause`, `stop`, `previous`, `next`, `rewind`, `fast_forward`, `channel_up`, `channel_down`, `delete`, `power`, `volume_up`, `volume_down`, `mute`, and `0` through `9`.
 
+## Themes and accent colors
+
+Version 0.6.0 adds complete appearance controls to the visual editor.
+
+### Theme
+
+- **System** — follows Home Assistant's current light/dark theme variables.
+- **Light** — forces the Smart Remote light appearance.
+- **Dark** — forces the Smart Remote dark appearance.
+
+### Accent color
+
+Available presets:
+
+- System
+- Blue
+- Purple
+- Teal
+- Green
+- Orange
+- Red
+- Pink
+- Custom
+
+**System** follows Home Assistant's current `--primary-color`. **Custom** reveals a hex color field such as `#6750A4`.
+
+The accent color is used for selected tabs, primary remote buttons, the Now Playing progress bar, active mapped-device power state, focus outlines, and the popup button icon.
+
+These settings apply equally to the full card and the popup version.
+
 ## Themes
 
 The visual editor offers:
@@ -328,7 +358,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.5.0**
+Current release: **v0.6.0**
 
 ## License
 
