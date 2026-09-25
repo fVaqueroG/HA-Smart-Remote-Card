@@ -207,6 +207,37 @@ When the active mapping has a device power entity, Smart Remote shows a device-p
 
 Both power controls use Home Assistant `turn_on` / `turn_off`, so switches, helpers, media players, and supported remotes can be used.
 
+## Now Playing and progress
+
+Version 0.5.0 adds a **Now Playing** block to the Playback tab.
+
+For each source mapping, Smart Remote can use an optional **Playback media entity**. If it is not configured, the card automatically tries the mapping's **Apps / source entity**, and then the control entity when that entity is already a `media_player`.
+
+When the chosen media player reports playback metadata, the card can show:
+
+- Media title
+- Series and episode information
+- Current app/source
+- Elapsed time
+- Total duration
+- Playback progress
+
+When Home Assistant reports `media_position_updated_at` and the entity is actively playing, the progress bar advances locally every second between Home Assistant state updates.
+
+Example:
+
+```yaml
+mappings:
+  - source: HDMI 1
+    name: Android TV
+    type: android_tv
+    entity: remote.mitv_aesp0
+    source_entity: media_player.android_tv_192_168_31_23
+    media_entity: media_player.android_tv_192_168_31_23
+```
+
+If the media player does not report position/duration, the progress bar is simply omitted.
+
 ## Mapped device apps and sources
 
 Version 0.3.0 adds an optional **Apps / source entity** to every TV-source mapping.
@@ -297,7 +328,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.4.2**
+Current release: **v0.5.0**
 
 ## License
 
