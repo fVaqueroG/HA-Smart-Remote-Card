@@ -162,7 +162,17 @@ fallback:
 
 Version 0.4.0 supports two independent power layers.
 
+### Main TV power selection
+
+The visual editor now makes this explicit in the **Display** section:
+
+- **Use Display / TV entity** — the main power button targets the selected display entity.
+- **Use separate power helper / entity** — reveals a dedicated **TV power helper / entity** picker.
+
+This separation keeps the TV entity responsible for source/status reporting while allowing power to use a helper such as `input_boolean.tv_sala`, a switch, remote entity, or another media player.
+
 ### Main TV power helper
+
 
 The global **TV power helper / entity** controls the main display power button. It can be the TV media player itself or another Home Assistant entity such as a switch, input boolean, remote, or helper.
 
@@ -283,7 +293,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.4.0**
+Current release: **v0.4.1**
 
 ## License
 
