@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.1 — 2026-09-25
+
+- Moved main TV power selection into the Display section.
+- Added an explicit Power control selector: use the TV entity or a separate power helper/entity.
+- The dedicated TV power helper field now appears only when separate-helper mode is selected.
+- Preserved backward compatibility with existing `power_entity` configurations.
+
+
 ## v0.4.0 — 2026-09-25
 
 - Added a dedicated TV power helper / entity setting.
