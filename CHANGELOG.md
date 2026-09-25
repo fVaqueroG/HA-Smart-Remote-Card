@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0 — 2026-09-25
+
+- Formalized Light, Dark, and System theme selection in the visual editor.
+- Added accent color presets: System, Blue, Purple, Teal, Green, Orange, Red, and Pink.
+- Added a Custom accent option with a hex color field.
+- Accent color now controls selected tabs, OK/playback primary buttons, Now Playing progress, active device-power state, focus outlines, and popup button icon.
+- System accent continues to follow Home Assistant's current primary theme color.
+- Theme and accent settings apply to both the full Smart Remote Card and popup remote.
+
+
 ## v0.5.0 — 2026-09-25
 
 - Added a Now Playing section to the Playback tab.
