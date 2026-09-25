@@ -40,6 +40,50 @@ The card registers as:
 type: custom:smart-remote-card
 ```
 
+
+## Popup button card
+
+Version 0.2.0 adds a second Lovelace card type:
+
+```yaml
+type: custom:smart-remote-popup-card
+```
+
+It appears separately in Home Assistant's **Add card** search as **Smart Remote Popup Button**.
+
+The popup version is a compact dashboard button that opens the complete Smart Remote in a modal. It is self-contained and does **not** require Browser Mod.
+
+Its visual editor includes the same display, global controls, source mappings, fallback controller, and appearance settings as the full card, plus:
+
+- Button label
+- Button icon
+- Button style: icon + text, icon only, or text only
+- Popup width: compact, normal, or wide
+
+Example:
+
+```yaml
+type: custom:smart-remote-popup-card
+button_label: Remote
+button_icon: mdi:remote-tv
+button_style: horizontal
+popup_width: normal
+display_entity: media_player.lg_webos_tv_ur7800psb
+power_entity: input_boolean.tv_sala
+volume_entity: media_player.lg_webos_tv_ur7800psb
+mappings:
+  - source: HDMI 1
+    name: Android TV
+    type: android_tv
+    entity: remote.mitv_aesp0
+fallback:
+  name: LG webOS
+  type: webos
+  entity: media_player.lg_webos_tv_ur7800psb
+```
+
+On phones, the popup automatically becomes a bottom sheet so the remote remains easy to reach.
+
 ## Recommended setup
 
 Add the card from the Home Assistant dashboard editor and use the **visual configuration** panel.
@@ -178,7 +222,7 @@ The visual editor offers:
 
 ## Version
 
-Current initial release: **v0.1.0**
+Current release: **v0.2.0**
 
 ## License
 
