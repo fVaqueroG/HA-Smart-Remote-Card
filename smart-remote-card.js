@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.4.1";
+const SMART_REMOTE_VERSION = "0.4.2";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -58,6 +58,17 @@ function norm(value) { return String(value ?? "").trim().toLowerCase(); }
 function domainOf(entity) { return String(entity || "").split(".")[0]; }
 function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
+function normalizePowerConfig(config) {
+  const next = config || {};
+  if (!next.power_mode) {
+    next.power_mode = next.power_entity && next.power_entity !== next.display_entity ? "helper" : "display";
+  }
+  if (next.power_mode === "helper" && !next.power_entity) {
+    next.power_mode = "display";
+  }
+  return next;
+}
+
 class SmartRemoteCard extends HTMLElement {
   constructor() {
     super();
@@ -87,7 +98,7 @@ class SmartRemoteCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("Smart Remote Card requires configuration.");
-    this._config = Object.assign({
+    this._config = normalizePowerConfig(Object.assign({
       title: "Smart Remote",
       source_attribute: "source",
       power_mode: "display",
@@ -99,11 +110,8 @@ class SmartRemoteCard extends HTMLElement {
       show_channels: true,
       mappings: [],
       fallback: { type: "webos", entity: "" },
-    }, config);
+    }, config));
     this._config.mappings = Array.isArray(config.mappings) ? config.mappings : [];
-    if (!config.power_mode) {
-      this._config.power_mode = config.power_entity && config.power_entity !== config.display_entity ? "helper" : "display";
-    }
     this.render();
   }
 
@@ -211,10 +219,9 @@ class SmartRemoteCard extends HTMLElement {
   }
 
   async _power() {
-    const inferredMode = this._config.power_entity && this._config.power_entity !== this._config.display_entity ? "helper" : "display";
-    const mode = this._config.power_mode || inferredMode;
-    const entity = mode === "helper" ? this._config.power_entity : this._config.display_entity;
-    if (mode === "helper" && !entity) return this._toast("Choose a TV power helper / entity in the visual editor.");
+    const config = normalizePowerConfig({ ...this._config });
+    const entity = config.power_mode === "helper" ? config.power_entity : config.display_entity;
+    if (config.power_mode === "helper" && !entity) return this._toast("Choose a TV power helper / entity in the visual editor.");
     return this._togglePowerEntity(entity, "TV power");
   }
 
@@ -439,7 +446,7 @@ class SmartRemoteCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = Object.assign(SmartRemoteCard.getStubConfig(), clone(config || {}));
+    this._config = normalizePowerConfig(Object.assign(SmartRemoteCard.getStubConfig(), clone(config || {})));
     this._config.mappings = Array.isArray(config?.mappings) ? clone(config.mappings) : [];
     this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config?.fallback || {}));
     if (!this._rendered || !this.matches(":focus-within")) this.render();
@@ -631,7 +638,7 @@ class SmartRemotePopupCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("Smart Remote Popup Button requires configuration.");
-    this._config = Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config));
+    this._config = normalizePowerConfig(Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config)));
     this._config.mappings = Array.isArray(config.mappings) ? clone(config.mappings) : [];
     this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config.fallback || {}));
     this.render();
@@ -743,7 +750,7 @@ class SmartRemotePopupCard extends HTMLElement {
 
 class SmartRemotePopupCardEditor extends SmartRemoteCardEditor {
   setConfig(config) {
-    this._config = Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config || {}));
+    this._config = normalizePowerConfig(Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config || {})));
     this._config.mappings = Array.isArray(config?.mappings) ? clone(config.mappings) : [];
     this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config?.fallback || {}));
     if (!this._rendered || !this.matches(":focus-within")) this.render();
