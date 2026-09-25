@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.5.0";
+const SMART_REMOTE_VERSION = "0.6.0";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -6,6 +6,29 @@ const PRESET_LABELS = {
   webos: "LG webOS",
   totalplay: "Totalplay",
   media_player: "Media Player",
+};
+
+const ACCENT_COLORS = {
+  system: "var(--primary-color)",
+  blue: "#3F51B5",
+  purple: "#6750A4",
+  teal: "#00897B",
+  green: "#43A047",
+  orange: "#FB8C00",
+  red: "#E53935",
+  pink: "#D81B60",
+};
+
+const ACCENT_LABELS = {
+  system: "System",
+  blue: "Blue",
+  purple: "Purple",
+  teal: "Teal",
+  green: "Green",
+  orange: "Orange",
+  red: "Red",
+  pink: "Pink",
+  custom: "Custom",
 };
 
 const PRESETS = {
@@ -69,6 +92,16 @@ function normalizePowerConfig(config) {
   return next;
 }
 
+function resolveAccent(config = {}) {
+  const key = config.accent_color || "system";
+  if (key === "custom") {
+    const custom = String(config.custom_accent_color || "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(custom) || /^#[0-9a-fA-F]{3}$/.test(custom)) return custom;
+    return ACCENT_COLORS.system;
+  }
+  return ACCENT_COLORS[key] || ACCENT_COLORS.system;
+}
+
 class SmartRemoteCard extends HTMLElement {
   constructor() {
     super();
@@ -87,6 +120,8 @@ class SmartRemoteCard extends HTMLElement {
       source_attribute: "source",
       power_mode: "display",
       theme: "system",
+      accent_color: "system",
+      custom_accent_color: "#6750A4",
       show_source_selector: true,
       show_device_source_selector: true,
       show_now_playing: true,
@@ -105,6 +140,8 @@ class SmartRemoteCard extends HTMLElement {
       source_attribute: "source",
       power_mode: "display",
       theme: "system",
+      accent_color: "system",
+      custom_accent_color: "#6750A4",
       show_source_selector: true,
       show_device_source_selector: true,
       show_now_playing: true,
@@ -426,6 +463,7 @@ class SmartRemoteCard extends HTMLElement {
     const display = this._displayState();
     const isOff = !display || ["off", "unavailable", "unknown"].includes(display.state);
     const theme = ["light", "dark"].includes(this._config.theme) ? this._config.theme : "system";
+    const accent = resolveAccent(this._config);
 
     const sourceSelector = this._config.show_source_selector !== false && sources.length
       ? `<select id="source-select" aria-label="TV source">${sources.map(s => `<option value="${esc(s)}" ${String(s) === String(source) ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>`
@@ -488,7 +526,7 @@ class SmartRemoteCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>${this._styles()}</style>
-      <ha-card data-theme="${theme}">
+      <ha-card data-theme="${theme}" style="--smart-accent:${esc(accent)}">
         <div class="shell">
           <header>
             <div class="heading">
@@ -536,13 +574,13 @@ class SmartRemoteCard extends HTMLElement {
       .shell{max-width:410px;margin:0 auto;padding:18px;background:var(--smart-bg);color:var(--smart-text)}
       header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.title{font-size:20px;font-weight:700;line-height:1.15}.status{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px;font-size:12px;color:var(--smart-muted)}.source{font-weight:700;color:var(--smart-text)}.dot{opacity:.55}.fallback{padding:2px 6px;border-radius:999px;background:var(--smart-soft);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
       button{border:0;color:var(--smart-text);background:var(--smart-panel);cursor:pointer;transition:transform .08s ease,background .15s ease}button:active:not(:disabled){transform:scale(.96)}button:disabled{opacity:.28;cursor:not-allowed}.round{width:44px;height:44px;border-radius:50%;display:grid;place-items:center}.power{color:var(--error-color,#e53935)}.power ha-icon{--mdc-icon-size:23px}
-      .source-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 11px;border:1px solid var(--smart-border);border-radius:14px;background:var(--smart-panel)}.source-row ha-icon{color:var(--smart-muted);--mdc-icon-size:21px}.source-select-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.source-select-wrap>span{font-size:11px;color:var(--smart-muted);white-space:nowrap}.source-row select{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--smart-text);padding:4px}.source-row option{color:#111;background:#fff}.device-source-row{margin-top:-4px}.device-power{width:34px;height:34px;flex:0 0 34px;border-radius:50%;display:grid;place-items:center;background:var(--smart-soft);color:var(--smart-muted)}.device-power.is-on{color:var(--primary-color);background:color-mix(in srgb,var(--primary-color) 16%,var(--smart-panel))}.device-power ha-icon{--mdc-icon-size:19px}.device-power-label{flex:1}
+      .source-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 11px;border:1px solid var(--smart-border);border-radius:14px;background:var(--smart-panel)}.source-row ha-icon{color:var(--smart-muted);--mdc-icon-size:21px}.source-select-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.source-select-wrap>span{font-size:11px;color:var(--smart-muted);white-space:nowrap}.source-row select{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--smart-text);padding:4px}.source-row option{color:#111;background:#fff}.device-source-row{margin-top:-4px}.device-power{width:34px;height:34px;flex:0 0 34px;border-radius:50%;display:grid;place-items:center;background:var(--smart-soft);color:var(--smart-muted)}.device-power.is-on{color:var(--smart-accent,var(--primary-color));background:color-mix(in srgb,var(--smart-accent,var(--primary-color)) 16%,var(--smart-panel))}.device-power ha-icon{--mdc-icon-size:19px}.device-power-label{flex:1}
       .global-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.global-row button{height:44px;border-radius:14px}.global-row ha-icon{--mdc-icon-size:24px}
-      .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;margin-bottom:16px;border-radius:14px;background:var(--smart-panel)}.tabs button{min-width:0;height:38px;border-radius:11px;background:transparent;color:var(--smart-muted);display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px}.tabs button.selected{background:var(--primary-color);color:var(--text-primary-color,#fff);box-shadow:0 2px 8px rgba(0,0,0,.12)}.tabs ha-icon{--mdc-icon-size:18px}@media(max-width:340px){.tabs span{display:none}}
-      main{min-height:238px;display:flex;flex-direction:column;justify-content:center}.utility-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.key{height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px}.key ha-icon{--mdc-icon-size:20px}.dpad{position:relative;width:184px;height:184px;margin:14px auto;border-radius:50%;background:radial-gradient(circle at center,var(--smart-panel) 0 32%,var(--smart-soft) 33% 100%);box-shadow:inset 0 0 0 1px var(--smart-border)}.icon-key{width:54px;height:54px;border-radius:50%;display:grid;place-items:center}.icon-key ha-icon{--mdc-icon-size:29px}.dpad .icon-key{position:absolute;background:transparent}.dpad .up{top:2px;left:65px}.dpad .down{bottom:2px;left:65px}.dpad .left{left:2px;top:65px}.dpad .right{right:2px;top:65px}.dpad .ok{position:absolute;left:62px;top:62px;width:60px;height:60px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);font-weight:800}.channel-row{margin-top:0}
-      .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:290px;width:100%;margin:auto}.digit{height:54px;border-radius:17px;font-size:18px;font-weight:700}.digit.icon-key{width:auto}.muted-slot{visibility:hidden}.now-playing{width:100%;margin:0 auto 16px;padding:12px;border:1px solid var(--smart-border);border-radius:16px;background:var(--smart-panel)}.now-playing-head{display:flex;align-items:center;gap:10px}.now-playing-head>ha-icon{--mdc-icon-size:28px;color:var(--primary-color);flex:0 0 auto}.now-playing-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.now-playing-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-copy span{font-size:11px;color:var(--smart-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-state{font-size:10px;color:var(--smart-muted);text-transform:capitalize}.progress-track{height:5px;margin-top:11px;border-radius:999px;overflow:hidden;background:var(--smart-soft)}.progress-fill{height:100%;border-radius:inherit;background:var(--primary-color);transition:width .35s linear}.progress-times{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--smart-muted)}.playback-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:290px;width:100%;margin:auto}.playback-grid .icon-key{width:100%;height:62px;border-radius:19px}.playback-grid .primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}
+      .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;margin-bottom:16px;border-radius:14px;background:var(--smart-panel)}.tabs button{min-width:0;height:38px;border-radius:11px;background:transparent;color:var(--smart-muted);display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px}.tabs button.selected{background:var(--smart-accent,var(--primary-color));color:var(--text-primary-color,#fff);box-shadow:0 2px 8px rgba(0,0,0,.12)}.tabs ha-icon{--mdc-icon-size:18px}@media(max-width:340px){.tabs span{display:none}}
+      main{min-height:238px;display:flex;flex-direction:column;justify-content:center}.utility-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.key{height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px}.key ha-icon{--mdc-icon-size:20px}.dpad{position:relative;width:184px;height:184px;margin:14px auto;border-radius:50%;background:radial-gradient(circle at center,var(--smart-panel) 0 32%,var(--smart-soft) 33% 100%);box-shadow:inset 0 0 0 1px var(--smart-border)}.icon-key{width:54px;height:54px;border-radius:50%;display:grid;place-items:center}.icon-key ha-icon{--mdc-icon-size:29px}.dpad .icon-key{position:absolute;background:transparent}.dpad .up{top:2px;left:65px}.dpad .down{bottom:2px;left:65px}.dpad .left{left:2px;top:65px}.dpad .right{right:2px;top:65px}.dpad .ok{position:absolute;left:62px;top:62px;width:60px;height:60px;border-radius:50%;background:var(--smart-accent,var(--primary-color));color:var(--text-primary-color,#fff);font-weight:800}.channel-row{margin-top:0}
+      .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:290px;width:100%;margin:auto}.digit{height:54px;border-radius:17px;font-size:18px;font-weight:700}.digit.icon-key{width:auto}.muted-slot{visibility:hidden}.now-playing{width:100%;margin:0 auto 16px;padding:12px;border:1px solid var(--smart-border);border-radius:16px;background:var(--smart-panel)}.now-playing-head{display:flex;align-items:center;gap:10px}.now-playing-head>ha-icon{--mdc-icon-size:28px;color:var(--smart-accent,var(--primary-color));flex:0 0 auto}.now-playing-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.now-playing-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-copy span{font-size:11px;color:var(--smart-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-state{font-size:10px;color:var(--smart-muted);text-transform:capitalize}.progress-track{height:5px;margin-top:11px;border-radius:999px;overflow:hidden;background:var(--smart-soft)}.progress-fill{height:100%;border-radius:inherit;background:var(--smart-accent,var(--primary-color));transition:width .35s linear}.progress-times{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--smart-muted)}.playback-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:290px;width:100%;margin:auto}.playback-grid .icon-key{width:100%;height:62px;border-radius:19px}.playback-grid .primary{background:var(--smart-accent,var(--primary-color));color:var(--text-primary-color,#fff)}
       footer{display:flex;justify-content:space-between;margin-top:14px;padding-top:10px;border-top:1px solid var(--smart-border);font-size:10px;color:var(--smart-muted)}
-      button:focus-visible,select:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+      button:focus-visible,select:focus-visible{outline:2px solid var(--smart-accent,var(--primary-color));outline-offset:2px}
     `;
   }
 }
@@ -710,13 +748,17 @@ class SmartRemoteCardEditor extends HTMLElement {
       </div>
 
       <h3>Appearance</h3>
-      <div class="grid"><div class="field"><label>Theme</label><select data-root="theme">${["system","light","dark"].map(v=>`<option value="${v}" ${v === (c.theme || "system") ? "selected" : ""}>${v[0].toUpperCase()+v.slice(1)}</option>`).join("")}</select></div></div>
+      <div class="grid">
+        <div class="field"><label>Theme</label><select data-root="theme">${["system","light","dark"].map(v=>`<option value="${v}" ${v === (c.theme || "system") ? "selected" : ""}>${v[0].toUpperCase()+v.slice(1)}</option>`).join("")}</select></div>
+        <div class="field"><label>Accent color</label><select data-root="accent_color">${Object.entries(ACCENT_LABELS).map(([v,label])=>`<option value="${v}" ${v === (c.accent_color || "system") ? "selected" : ""}>${label}</option>`).join("")}</select></div>
+        ${(c.accent_color || "system") === "custom" ? `<div class="field full"><label>Custom accent (hex)</label><input data-root="custom_accent_color" value="${esc(c.custom_accent_color || "#6750A4")}" placeholder="#6750A4" pattern="^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$"></div>` : ""}
+      </div>
       <div class="checks">
         ${[["show_source_selector","TV source selector"],["show_device_source_selector","Mapped device app/source selector"],["show_now_playing","Now Playing / progress"],["show_keypad","Keypad tab"],["show_playback","Playback tab"],["show_channels","Channel controls"]].map(([key,label])=>`<label class="check"><input type="checkbox" data-check="${key}" ${c[key] !== false ? "checked" : ""}>${label}</label>`).join("")}
       </div>
       <div class="version">Smart Remote Card v${SMART_REMOTE_VERSION}</div>`;
 
-    this.shadowRoot.querySelectorAll("[data-root]").forEach(el => el.addEventListener("change", e => { this._update([el.dataset.root], e.target.value); if (["display_entity","power_mode"].includes(el.dataset.root)) this.render(); }));
+    this.shadowRoot.querySelectorAll("[data-root]").forEach(el => el.addEventListener("change", e => { this._update([el.dataset.root], e.target.value); if (["display_entity","power_mode","accent_color"].includes(el.dataset.root)) this.render(); }));
     this.shadowRoot.querySelectorAll("input[data-root]").forEach(el => el.addEventListener("input", e => this._update([el.dataset.root], e.target.value)));
     this.shadowRoot.querySelectorAll("[data-check]").forEach(el => el.addEventListener("change", e => this._update([el.dataset.check], e.target.checked)));
     this.shadowRoot.querySelectorAll(".mapping").forEach(box => {
@@ -850,10 +892,11 @@ class SmartRemotePopupCard extends HTMLElement {
     const style = this._config.button_style || "horizontal";
     const iconOnly = style === "icon";
     const textOnly = style === "text";
+    const accent = resolveAccent(this._config);
 
     this.shadowRoot.innerHTML =
-      '<style>:host{display:block}ha-card{height:100%;overflow:hidden;cursor:pointer}button{width:100%;min-height:56px;height:100%;padding:10px 14px;border:0;background:transparent;color:var(--primary-text-color);font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left}button:active{transform:scale(.98)}button:focus-visible{outline:2px solid var(--primary-color);outline-offset:-3px;border-radius:var(--ha-card-border-radius,12px)}ha-icon{--mdc-icon-size:24px;color:var(--primary-color)}.label{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chevron{margin-left:auto;color:var(--secondary-text-color)}</style>' +
-      '<ha-card><button id="open" aria-label="' + esc(label) + '">' +
+      '<style>:host{display:block}ha-card{height:100%;overflow:hidden;cursor:pointer}button{width:100%;min-height:56px;height:100%;padding:10px 14px;border:0;background:transparent;color:var(--primary-text-color);font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left}button:active{transform:scale(.98)}button:focus-visible{outline:2px solid var(--smart-accent,var(--primary-color));outline-offset:-3px;border-radius:var(--ha-card-border-radius,12px)}ha-icon{--mdc-icon-size:24px;color:var(--smart-accent,var(--primary-color))}.label{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chevron{margin-left:auto;color:var(--secondary-text-color)}</style>' +
+      '<ha-card style="--smart-accent:' + esc(accent) + '"><button id="open" aria-label="' + esc(label) + '">' +
       (textOnly ? "" : '<ha-icon icon="' + esc(icon) + '"></ha-icon>') +
       (iconOnly ? "" : '<span class="label">' + esc(label) + '</span>') +
       (style === "horizontal" ? '<ha-icon class="chevron" icon="mdi:chevron-up"></ha-icon>' : "") +
