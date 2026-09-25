@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.1.0";
+const SMART_REMOTE_VERSION = "0.2.0";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -532,8 +532,193 @@ class SmartRemoteCardEditor extends HTMLElement {
   }
 }
 
+
+class SmartRemotePopupCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._config = {};
+    this._hass = null;
+    this._portal = null;
+    this._escHandler = event => {
+      if (event.key === "Escape") this._closePopup();
+    };
+  }
+
+  static getConfigElement() { return document.createElement("smart-remote-popup-card-editor"); }
+  static getStubConfig() {
+    return Object.assign(SmartRemoteCard.getStubConfig(), {
+      button_label: "Remote",
+      button_icon: "mdi:remote-tv",
+      button_style: "horizontal",
+      popup_width: "normal",
+    });
+  }
+
+  setConfig(config) {
+    if (!config) throw new Error("Smart Remote Popup Button requires configuration.");
+    this._config = Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config));
+    this._config.mappings = Array.isArray(config.mappings) ? clone(config.mappings) : [];
+    this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config.fallback || {}));
+    this.render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const remote = this._portal?.querySelector("smart-remote-card");
+    if (remote) remote.hass = hass;
+    this.render();
+  }
+
+  getCardSize() { return 1; }
+  getGridOptions() {
+    const style = this._config.button_style || "horizontal";
+    return { columns: style === "icon" ? 1 : 2, rows: 1, min_columns: 1, min_rows: 1 };
+  }
+
+  _popupWidth() {
+    const mode = String(this._config.popup_width || "normal").toLowerCase();
+    if (mode === "wide") return "min(620px, calc(100vw - 24px))";
+    if (mode === "compact") return "min(420px, calc(100vw - 24px))";
+    return "min(500px, calc(100vw - 24px))";
+  }
+
+  _remoteConfig() {
+    const config = clone(this._config);
+    delete config.button_label;
+    delete config.button_icon;
+    delete config.button_style;
+    delete config.popup_width;
+    return config;
+  }
+
+  _openPopup() {
+    if (this._portal) return;
+    const portal = document.createElement("div");
+    portal.id = "smart-remote-popup-portal";
+    portal.style.cssText = "position:fixed;inset:0;z-index:2147483000;pointer-events:none;";
+
+    const style = document.createElement("style");
+    style.textContent =
+      "#smart-remote-popup-portal .srp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);backdrop-filter:blur(2px);pointer-events:auto}" +
+      "#smart-remote-popup-portal .srp-shell{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:" + this._popupWidth() + ";max-height:min(88dvh,760px);overflow:auto;border-radius:24px;pointer-events:auto;box-shadow:0 24px 80px rgba(0,0,0,.45);overscroll-behavior:contain}" +
+      "#smart-remote-popup-portal .srp-close{position:sticky;float:right;top:10px;right:10px;z-index:20;width:36px;height:36px;margin:10px 10px -46px 0;border:0;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,transparent);color:var(--primary-text-color,#111);box-shadow:0 2px 12px rgba(0,0,0,.16);cursor:pointer}" +
+      "#smart-remote-popup-portal .srp-close ha-icon{--mdc-icon-size:20px}" +
+      "#smart-remote-popup-portal smart-remote-card{display:block}" +
+      "@media(max-width:520px){#smart-remote-popup-portal .srp-shell{top:auto;bottom:0;left:0;transform:none;width:100%;max-height:92dvh;border-radius:24px 24px 0 0}}";
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "srp-backdrop";
+
+    const shell = document.createElement("div");
+    shell.className = "srp-shell";
+    shell.setAttribute("role", "dialog");
+    shell.setAttribute("aria-modal", "true");
+    shell.setAttribute("aria-label", "Smart Remote");
+
+    const close = document.createElement("button");
+    close.className = "srp-close";
+    close.title = "Close";
+    close.setAttribute("aria-label", "Close");
+    close.innerHTML = '<ha-icon icon="mdi:close"></ha-icon>';
+
+    const remote = document.createElement("smart-remote-card");
+    remote.setConfig(this._remoteConfig());
+    if (this._hass) remote.hass = this._hass;
+
+    shell.append(close, remote);
+    portal.append(style, backdrop, shell);
+
+    backdrop.addEventListener("click", () => this._closePopup());
+    close.addEventListener("click", () => this._closePopup());
+
+    (document.body || document.documentElement).appendChild(portal);
+    document.addEventListener("keydown", this._escHandler);
+    this._portal = portal;
+  }
+
+  _closePopup() {
+    if (this._portal) this._portal.remove();
+    this._portal = null;
+    document.removeEventListener("keydown", this._escHandler);
+  }
+
+  disconnectedCallback() { this._closePopup(); }
+
+  render() {
+    if (!this.shadowRoot) return;
+    const label = this._config.button_label || "Remote";
+    const icon = this._config.button_icon || "mdi:remote-tv";
+    const style = this._config.button_style || "horizontal";
+    const iconOnly = style === "icon";
+    const textOnly = style === "text";
+
+    this.shadowRoot.innerHTML =
+      '<style>:host{display:block}ha-card{height:100%;overflow:hidden;cursor:pointer}button{width:100%;min-height:56px;height:100%;padding:10px 14px;border:0;background:transparent;color:var(--primary-text-color);font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left}button:active{transform:scale(.98)}button:focus-visible{outline:2px solid var(--primary-color);outline-offset:-3px;border-radius:var(--ha-card-border-radius,12px)}ha-icon{--mdc-icon-size:24px;color:var(--primary-color)}.label{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chevron{margin-left:auto;color:var(--secondary-text-color)}</style>' +
+      '<ha-card><button id="open" aria-label="' + esc(label) + '">' +
+      (textOnly ? "" : '<ha-icon icon="' + esc(icon) + '"></ha-icon>') +
+      (iconOnly ? "" : '<span class="label">' + esc(label) + '</span>') +
+      (style === "horizontal" ? '<ha-icon class="chevron" icon="mdi:chevron-up"></ha-icon>' : "") +
+      "</button></ha-card>";
+
+    const button = this.shadowRoot.getElementById("open");
+    if (button && iconOnly) button.style.justifyContent = "center";
+    button?.addEventListener("click", () => this._openPopup());
+  }
+}
+
+class SmartRemotePopupCardEditor extends SmartRemoteCardEditor {
+  setConfig(config) {
+    this._config = Object.assign(SmartRemotePopupCard.getStubConfig(), clone(config || {}));
+    this._config.mappings = Array.isArray(config?.mappings) ? clone(config.mappings) : [];
+    this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config?.fallback || {}));
+    if (!this._rendered || !this.matches(":focus-within")) this.render();
+  }
+
+  render() {
+    super.render();
+    if (!this.shadowRoot) return;
+
+    const c = this._config || SmartRemotePopupCard.getStubConfig();
+    const wrap = document.createElement("div");
+    wrap.className = "popup-options";
+    wrap.innerHTML =
+      '<h3>Popup button</h3>' +
+      '<p class="help">Configure the compact dashboard button that opens this remote.</p>' +
+      '<div class="grid">' +
+        '<div class="field"><label>Button label</label><input data-popup-root="button_label" value="' + esc(c.button_label || "Remote") + '"></div>' +
+        '<div class="field"><label>Button icon</label><input data-popup-root="button_icon" value="' + esc(c.button_icon || "mdi:remote-tv") + '"></div>' +
+        '<div class="field"><label>Button style</label><select data-popup-root="button_style">' +
+          '<option value="horizontal"' + ((c.button_style || "horizontal") === "horizontal" ? " selected" : "") + '>Icon + text</option>' +
+          '<option value="icon"' + (c.button_style === "icon" ? " selected" : "") + '>Icon only</option>' +
+          '<option value="text"' + (c.button_style === "text" ? " selected" : "") + '>Text only</option>' +
+        '</select></div>' +
+        '<div class="field"><label>Popup width</label><select data-popup-root="popup_width">' +
+          '<option value="compact"' + (c.popup_width === "compact" ? " selected" : "") + '>Compact</option>' +
+          '<option value="normal"' + ((c.popup_width || "normal") === "normal" ? " selected" : "") + '>Normal</option>' +
+          '<option value="wide"' + (c.popup_width === "wide" ? " selected" : "") + '>Wide</option>' +
+        '</select></div>' +
+      '</div>';
+
+    const firstHeading = this.shadowRoot.querySelector("h3");
+    if (firstHeading) firstHeading.before(wrap);
+    else this.shadowRoot.prepend(wrap);
+
+    wrap.querySelectorAll("[data-popup-root]").forEach(el => {
+      const eventName = el.tagName === "INPUT" ? "input" : "change";
+      el.addEventListener(eventName, event => this._update([el.dataset.popupRoot], event.target.value));
+    });
+
+    const version = this.shadowRoot.querySelector(".version");
+    if (version) version.textContent = "Smart Remote Popup Button v" + SMART_REMOTE_VERSION;
+  }
+}
+
+
 if (!customElements.get("smart-remote-card")) customElements.define("smart-remote-card", SmartRemoteCard);
 if (!customElements.get("smart-remote-card-editor")) customElements.define("smart-remote-card-editor", SmartRemoteCardEditor);
+if (!customElements.get("smart-remote-popup-card")) customElements.define("smart-remote-popup-card", SmartRemotePopupCard);
+if (!customElements.get("smart-remote-popup-card-editor")) customElements.define("smart-remote-popup-card-editor", SmartRemotePopupCardEditor);
 
 window.customCards = window.customCards || [];
 if (!window.customCards.some(card => card.type === "smart-remote-card")) {
@@ -541,6 +726,16 @@ if (!window.customCards.some(card => card.type === "smart-remote-card")) {
     type: "smart-remote-card",
     name: "Smart Remote Card",
     description: "A source-aware universal remote that routes commands to the device connected to the active TV input.",
+    preview: true,
+    documentationURL: "https://github.com/fVaqueroG/HA-Smart-Remote-Card",
+  });
+}
+
+if (!window.customCards.some(card => card.type === "smart-remote-popup-card")) {
+  window.customCards.push({
+    type: "smart-remote-popup-card",
+    name: "Smart Remote Popup Button",
+    description: "Open a fully configured Smart Remote in a popup from a compact dashboard button.",
     preview: true,
     documentationURL: "https://github.com/fVaqueroG/HA-Smart-Remote-Card",
   });
