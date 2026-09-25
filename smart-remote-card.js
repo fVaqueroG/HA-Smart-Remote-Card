@@ -167,16 +167,17 @@ class SmartRemoteCard extends HTMLElement {
 
     if (route.type === "media_player") return this._sendMediaPlayer(entity, action);
 
-    const command = this._commandFor(route, action);
-    if (!command) return;
-
     if (route.type === "webos") {
       if (action === "play_pause") return this._call("media_player", "media_play_pause", {}, entity);
       if (action === "stop") return this._call("media_player", "media_stop", {}, entity);
       if (action === "previous") return this._call("media_player", "media_previous_track", {}, entity);
       if (action === "next") return this._call("media_player", "media_next_track", {}, entity);
-      return this._call("webostv", "button", { button: command }, entity);
     }
+
+    const command = this._commandFor(route, action);
+    if (!command) return;
+
+    if (route.type === "webos") return this._call("webostv", "button", { button: command }, entity);
 
     return this._call("remote", "send_command", { command }, entity);
   }
@@ -375,7 +376,7 @@ class SmartRemoteCardEditor extends HTMLElement {
     this._config = Object.assign(SmartRemoteCard.getStubConfig(), clone(config || {}));
     this._config.mappings = Array.isArray(config?.mappings) ? clone(config.mappings) : [];
     this._config.fallback = Object.assign({ type: "webos", entity: "" }, clone(config?.fallback || {}));
-    this.render();
+    if (!this._rendered || !this.matches(":focus-within")) this.render();
   }
 
   _fire(next) {
@@ -476,7 +477,7 @@ class SmartRemoteCardEditor extends HTMLElement {
       <h3>Global TV controls</h3>
       <p class="help">Power and volume stay on these entities even when HDMI device routing changes.</p>
       <div class="grid">
-        <div class="field full"><label>Power entity</label><select data-root="power_entity">${this._entityOptions(c.power_entity || c.display_entity,[])}</select></div>
+        <div class="field full"><label>Power entity</label><select data-root="power_entity">${this._entityOptions(c.power_entity || c.display_entity,["media_player","switch","input_boolean"])}</select></div>
         <div class="field full"><label>Volume entity</label><select data-root="volume_entity">${this._entityOptions(c.volume_entity || c.display_entity,["media_player","remote"])}</select></div>
         <div class="field"><label>Remote volume preset</label><select data-root="volume_remote_type">${["android_tv","totalplay","remote"].map(v=>`<option value="${v}" ${v === (c.volume_remote_type || "android_tv") ? "selected" : ""}>${PRESET_LABELS[v]}</option>`).join("")}</select></div>
       </div>
