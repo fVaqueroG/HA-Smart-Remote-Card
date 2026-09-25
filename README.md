@@ -158,6 +158,10 @@ fallback:
   entity: media_player.lg_webos_tv_ur7800psb
 ```
 
+## Power helper routing fix
+
+Version 0.4.2 fixes an issue where the popup remote and visual editor could default back to the display entity even when a separate TV `power_entity` helper had already been configured. Power-mode normalization is now applied consistently in the full card, popup card, and both visual editors.
+
 ## Power helpers
 
 Version 0.4.0 supports two independent power layers.
@@ -293,7 +297,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.4.1**
+Current release: **v0.4.2**
 
 ## License
 
