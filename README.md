@@ -158,6 +158,32 @@ fallback:
   entity: media_player.lg_webos_tv_ur7800psb
 ```
 
+## Mapped device apps and sources
+
+Version 0.3.0 adds an optional **Apps / source entity** to every TV-source mapping.
+
+This is useful when the navigation remote and the app/source entity are different. For example, an Android TV mapping can use:
+
+- **Control entity:** `remote.mitv_aesp0`
+- **Apps / source entity:** an Android TV `media_player.*` entity that exposes `source_list`
+
+When the mapped source is active, Smart Remote reads the selected media player's `source_list`. If sources are available, a second selector appears below the TV input selector with an **Apps** icon. Selecting an item calls Home Assistant's `media_player.select_source` for that mapped device.
+
+If the configured entity does not expose a non-empty `source_list`, the selector stays hidden automatically.
+
+Example:
+
+```yaml
+mappings:
+  - source: HDMI 1
+    name: Android TV
+    type: android_tv
+    entity: remote.mitv_aesp0
+    source_entity: media_player.android_tv
+```
+
+For mappings whose control type is already **Media Player**, the same media-player entity is used automatically unless a different Apps / source entity is selected.
+
 ## Control presets
 
 ### Android TV Remote
@@ -222,7 +248,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.2.0**
+Current release: **v0.3.0**
 
 ## License
 
