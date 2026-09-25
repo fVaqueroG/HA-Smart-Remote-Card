@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.4.2";
+const SMART_REMOTE_VERSION = "0.5.0";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -77,6 +77,7 @@ class SmartRemoteCard extends HTMLElement {
     this._hass = null;
     this._tab = "nav";
     this._lastSource = undefined;
+    this._progressTimer = null;
   }
 
   static getConfigElement() { return document.createElement("smart-remote-card-editor"); }
@@ -88,6 +89,7 @@ class SmartRemoteCard extends HTMLElement {
       theme: "system",
       show_source_selector: true,
       show_device_source_selector: true,
+      show_now_playing: true,
       show_keypad: true,
       show_playback: true,
       show_channels: true,
@@ -105,6 +107,7 @@ class SmartRemoteCard extends HTMLElement {
       theme: "system",
       show_source_selector: true,
       show_device_source_selector: true,
+      show_now_playing: true,
       show_keypad: true,
       show_playback: true,
       show_channels: true,
@@ -287,6 +290,117 @@ class SmartRemoteCard extends HTMLElement {
     return this._call("media_player", "select_source", { source }, entity);
   }
 
+  _mediaEntity(route = this._activeMapping()) {
+    if (!route) return "";
+    if (route.media_entity) return route.media_entity;
+    if (route.source_entity) return route.source_entity;
+    return route.type === "media_player" ? route.entity || "" : "";
+  }
+
+  _mediaState(route = this._activeMapping()) {
+    const entity = this._mediaEntity(route);
+    return entity ? this._hass?.states?.[entity] || null : null;
+  }
+
+  _playbackSnapshot(route = this._activeMapping()) {
+    const state = this._mediaState(route);
+    if (!state) return null;
+    const attrs = state.attributes || {};
+    const duration = Number(attrs.media_duration);
+    let position = Number(attrs.media_position);
+    if (!Number.isFinite(position)) position = null;
+
+    const updatedAt = attrs.media_position_updated_at ? Date.parse(attrs.media_position_updated_at) : NaN;
+    if (position != null && state.state === "playing" && Number.isFinite(updatedAt)) {
+      position += Math.max(0, (Date.now() - updatedAt) / 1000);
+    }
+
+    if (position != null) position = Math.max(0, position);
+    if (Number.isFinite(duration) && duration > 0 && position != null) position = Math.min(position, duration);
+
+    return {
+      entity: this._mediaEntity(route),
+      state: state.state,
+      attrs,
+      duration: Number.isFinite(duration) && duration > 0 ? duration : null,
+      position,
+    };
+  }
+
+  _formatMediaTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "--:--";
+    const total = Math.floor(seconds);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    return hours > 0
+      ? hours + ":" + String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0")
+      : minutes + ":" + String(secs).padStart(2, "0");
+  }
+
+  _nowPlayingMarkup(route = this._activeMapping()) {
+    if (this._config.show_now_playing === false) return "";
+    const snap = this._playbackSnapshot(route);
+    if (!snap) return "";
+    const a = snap.attrs;
+    const title = a.media_title || a.media_series_title || a.app_name || a.source || "";
+    const details = [];
+    if (a.media_series_title && a.media_series_title !== title) details.push(a.media_series_title);
+    const season = a.media_season != null ? "S" + a.media_season : "";
+    const episode = a.media_episode != null ? "E" + a.media_episode : "";
+    if (season || episode) details.push(season + episode);
+    if (a.app_name && a.app_name !== title) details.push(a.app_name);
+    else if (a.source && a.source !== title) details.push(a.source);
+
+    const hasProgress = snap.position != null && snap.duration != null;
+    if (!title && !details.length && !hasProgress) return "";
+
+    const percent = hasProgress ? Math.max(0, Math.min(100, (snap.position / snap.duration) * 100)) : 0;
+    const stateLabel = snap.state ? snap.state.charAt(0).toUpperCase() + snap.state.slice(1) : "";
+
+    return `<section class="now-playing" data-media-entity="${esc(snap.entity)}">
+      <div class="now-playing-head">
+        <ha-icon icon="${snap.state === "playing" ? "mdi:play-circle" : snap.state === "paused" ? "mdi:pause-circle" : "mdi:television-play"}"></ha-icon>
+        <div class="now-playing-copy">
+          <strong>${esc(title || "Now Playing")}</strong>
+          ${details.length ? `<span>${esc(details.join(" · "))}</span>` : ""}
+        </div>
+        ${stateLabel ? `<span class="now-playing-state">${esc(stateLabel)}</span>` : ""}
+      </div>
+      ${hasProgress ? `<div class="progress-track" aria-label="Playback progress"><div class="progress-fill" data-progress-fill style="width:${percent}%"></div></div>
+      <div class="progress-times"><span data-progress-elapsed>${this._formatMediaTime(snap.position)}</span><span>${this._formatMediaTime(snap.duration)}</span></div>` : ""}
+    </section>`;
+  }
+
+  _clearProgressTimer() {
+    if (this._progressTimer) clearInterval(this._progressTimer);
+    this._progressTimer = null;
+  }
+
+  _syncProgressTimer() {
+    this._clearProgressTimer();
+    if (this._tab !== "playback" || this._config.show_now_playing === false) return;
+    const snap = this._playbackSnapshot();
+    if (!snap || snap.state !== "playing" || snap.position == null || snap.duration == null) return;
+    if (!snap.attrs.media_position_updated_at) return;
+    this._progressTimer = setInterval(() => this._updateProgressOnly(), 1000);
+  }
+
+  _updateProgressOnly() {
+    const fill = this.shadowRoot?.querySelector("[data-progress-fill]");
+    const elapsed = this.shadowRoot?.querySelector("[data-progress-elapsed]");
+    if (!fill || !elapsed) return;
+    const snap = this._playbackSnapshot();
+    if (!snap || snap.position == null || snap.duration == null) return;
+    const percent = Math.max(0, Math.min(100, (snap.position / snap.duration) * 100));
+    fill.style.width = percent + "%";
+    elapsed.textContent = this._formatMediaTime(snap.position);
+  }
+
+  disconnectedCallback() {
+    this._clearProgressTimer();
+  }
+
   _supported(action) {
     const route = this._activeMapping();
     if (route?.type === "media_player") return ["play_pause","play","pause","stop","next","previous","volume_up","volume_down","mute","channel_up","channel_down"].includes(action);
@@ -361,7 +475,8 @@ class SmartRemoteCard extends HTMLElement {
         <button class="digit muted-slot" disabled></button><button class="digit" data-action="0" ${this._supported("0") ? "" : "disabled"}>0</button>${this._iconButton("delete", "mdi:backspace-outline", "Delete", "digit")}
       </div>`;
     } else {
-      panel = `<div class="playback-grid">
+      panel = `${this._nowPlayingMarkup(route)}
+      <div class="playback-grid">
         ${this._iconButton("rewind", "mdi:rewind", "Rewind")}
         ${this._iconButton("play_pause", "mdi:play-pause", "Play/Pause", "primary")}
         ${this._iconButton("fast_forward", "mdi:fast-forward", "Fast forward")}
@@ -407,6 +522,7 @@ class SmartRemoteCard extends HTMLElement {
     this.shadowRoot.getElementById("source-select")?.addEventListener("change", e => this._selectSource(e.target.value));
     this.shadowRoot.getElementById("device-source-select")?.addEventListener("change", e => this._selectDeviceSource(e.target.value));
     this.shadowRoot.getElementById("device-power")?.addEventListener("click", () => this._devicePower());
+    this._syncProgressTimer();
   }
 
   _styles() {
@@ -424,7 +540,7 @@ class SmartRemoteCard extends HTMLElement {
       .global-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.global-row button{height:44px;border-radius:14px}.global-row ha-icon{--mdc-icon-size:24px}
       .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;margin-bottom:16px;border-radius:14px;background:var(--smart-panel)}.tabs button{min-width:0;height:38px;border-radius:11px;background:transparent;color:var(--smart-muted);display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px}.tabs button.selected{background:var(--primary-color);color:var(--text-primary-color,#fff);box-shadow:0 2px 8px rgba(0,0,0,.12)}.tabs ha-icon{--mdc-icon-size:18px}@media(max-width:340px){.tabs span{display:none}}
       main{min-height:238px;display:flex;flex-direction:column;justify-content:center}.utility-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.key{height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px}.key ha-icon{--mdc-icon-size:20px}.dpad{position:relative;width:184px;height:184px;margin:14px auto;border-radius:50%;background:radial-gradient(circle at center,var(--smart-panel) 0 32%,var(--smart-soft) 33% 100%);box-shadow:inset 0 0 0 1px var(--smart-border)}.icon-key{width:54px;height:54px;border-radius:50%;display:grid;place-items:center}.icon-key ha-icon{--mdc-icon-size:29px}.dpad .icon-key{position:absolute;background:transparent}.dpad .up{top:2px;left:65px}.dpad .down{bottom:2px;left:65px}.dpad .left{left:2px;top:65px}.dpad .right{right:2px;top:65px}.dpad .ok{position:absolute;left:62px;top:62px;width:60px;height:60px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);font-weight:800}.channel-row{margin-top:0}
-      .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:290px;width:100%;margin:auto}.digit{height:54px;border-radius:17px;font-size:18px;font-weight:700}.digit.icon-key{width:auto}.muted-slot{visibility:hidden}.playback-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:290px;width:100%;margin:auto}.playback-grid .icon-key{width:100%;height:62px;border-radius:19px}.playback-grid .primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}
+      .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:290px;width:100%;margin:auto}.digit{height:54px;border-radius:17px;font-size:18px;font-weight:700}.digit.icon-key{width:auto}.muted-slot{visibility:hidden}.now-playing{width:100%;margin:0 auto 16px;padding:12px;border:1px solid var(--smart-border);border-radius:16px;background:var(--smart-panel)}.now-playing-head{display:flex;align-items:center;gap:10px}.now-playing-head>ha-icon{--mdc-icon-size:28px;color:var(--primary-color);flex:0 0 auto}.now-playing-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.now-playing-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-copy span{font-size:11px;color:var(--smart-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.now-playing-state{font-size:10px;color:var(--smart-muted);text-transform:capitalize}.progress-track{height:5px;margin-top:11px;border-radius:999px;overflow:hidden;background:var(--smart-soft)}.progress-fill{height:100%;border-radius:inherit;background:var(--primary-color);transition:width .35s linear}.progress-times{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--smart-muted)}.playback-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:290px;width:100%;margin:auto}.playback-grid .icon-key{width:100%;height:62px;border-radius:19px}.playback-grid .primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}
       footer{display:flex;justify-content:space-between;margin-top:14px;padding-top:10px;border-top:1px solid var(--smart-border);font-size:10px;color:var(--smart-muted)}
       button:focus-visible,select:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
     `;
@@ -509,7 +625,7 @@ class SmartRemoteCardEditor extends HTMLElement {
     const sources = this._hass?.states?.[next.display_entity]?.attributes?.source_list || [];
     const used = new Set(next.mappings.map(m => m.source));
     const source = sources.find(s => !used.has(s)) || "HDMI 1";
-    next.mappings.push({ source, name: "", type: "android_tv", entity: "", source_entity: "", power_entity: "" });
+    next.mappings.push({ source, name: "", type: "android_tv", entity: "", source_entity: "", media_entity: "", power_entity: "" });
     this._fire(next);
     this.render();
   }
@@ -578,6 +694,7 @@ class SmartRemoteCardEditor extends HTMLElement {
             <div class="field"><label>Control type</label><select data-map="type">${this._typeOptions(m.type || "android_tv")}</select></div>
             <div class="field"><label>Control entity</label><select data-map="entity">${this._entityOptions(m.entity || "",domains)}</select></div>
             <div class="field full"><label>Apps / source entity (optional)</label><select data-map="source_entity">${this._entityOptions(m.source_entity || (m.type === "media_player" ? m.entity : ""),["media_player"])}</select></div>
+            <div class="field full"><label>Playback media entity (optional)</label><select data-map="media_entity">${this._entityOptions(m.media_entity || m.source_entity || (m.type === "media_player" ? m.entity : ""),["media_player"])}</select></div>
             <div class="field full"><label>Device power helper / entity (optional)</label><select data-map="power_entity">${this._entityOptions(m.power_entity || "",["media_player","switch","input_boolean","remote"])}</select></div>
           </div>
         </div>`;
@@ -595,7 +712,7 @@ class SmartRemoteCardEditor extends HTMLElement {
       <h3>Appearance</h3>
       <div class="grid"><div class="field"><label>Theme</label><select data-root="theme">${["system","light","dark"].map(v=>`<option value="${v}" ${v === (c.theme || "system") ? "selected" : ""}>${v[0].toUpperCase()+v.slice(1)}</option>`).join("")}</select></div></div>
       <div class="checks">
-        ${[["show_source_selector","TV source selector"],["show_device_source_selector","Mapped device app/source selector"],["show_keypad","Keypad tab"],["show_playback","Playback tab"],["show_channels","Channel controls"]].map(([key,label])=>`<label class="check"><input type="checkbox" data-check="${key}" ${c[key] !== false ? "checked" : ""}>${label}</label>`).join("")}
+        ${[["show_source_selector","TV source selector"],["show_device_source_selector","Mapped device app/source selector"],["show_now_playing","Now Playing / progress"],["show_keypad","Keypad tab"],["show_playback","Playback tab"],["show_channels","Channel controls"]].map(([key,label])=>`<label class="check"><input type="checkbox" data-check="${key}" ${c[key] !== false ? "checked" : ""}>${label}</label>`).join("")}
       </div>
       <div class="version">Smart Remote Card v${SMART_REMOTE_VERSION}</div>`;
 
