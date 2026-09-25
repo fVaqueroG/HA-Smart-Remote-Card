@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.0 — 2026-09-25
+
+- Added `custom:smart-remote-popup-card`.
+- Added **Smart Remote Popup Button** to Home Assistant's Add Card search.
+- Added a self-contained modal popup with backdrop and close controls; no Browser Mod dependency.
+- Added compact button styles: icon + text, icon only, and text only.
+- Added compact, normal, and wide popup sizes.
+- Added mobile bottom-sheet behavior.
+- Reused the full Smart Remote visual configuration for display, mappings, global controls, fallback, and theme.
+
+
 ## v0.1.0 — 2026-09-25
 
 Initial Smart Remote Card release.
