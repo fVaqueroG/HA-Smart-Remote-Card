@@ -158,6 +158,41 @@ fallback:
   entity: media_player.lg_webos_tv_ur7800psb
 ```
 
+## Power helpers
+
+Version 0.4.0 supports two independent power layers.
+
+### Main TV power helper
+
+The global **TV power helper / entity** controls the main display power button. It can be the TV media player itself or another Home Assistant entity such as a switch, input boolean, remote, or helper.
+
+Example:
+
+```yaml
+display_entity: media_player.lg_webos_tv_ur7800psb
+power_entity: input_boolean.tv_sala
+```
+
+### Mapped device power helper
+
+Each source mapping can also have its own optional **Device power helper / entity**.
+
+Example:
+
+```yaml
+mappings:
+  - source: HDMI 1
+    name: Android TV
+    type: android_tv
+    entity: remote.mitv_aesp0
+    source_entity: media_player.android_tv_192_168_31_23
+    power_entity: switch.android_tv_power
+```
+
+When the active mapping has a device power entity, Smart Remote shows a device-power button next to that mapped device's app/source selector. If no device power entity is configured, the button is hidden.
+
+Both power controls use Home Assistant `turn_on` / `turn_off`, so switches, helpers, media players, and supported remotes can be used.
+
 ## Mapped device apps and sources
 
 Version 0.3.0 adds an optional **Apps / source entity** to every TV-source mapping.
@@ -248,7 +283,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.3.0**
+Current release: **v0.4.0**
 
 ## License
 
