@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.5.0 — 2026-09-25
+
+- Added a Now Playing section to the Playback tab.
+- Added live playback progress using `media_position`, `media_duration`, and `media_position_updated_at`.
+- Progress advances locally each second while the media player is in the playing state.
+- Added elapsed and total playback time.
+- Added title, series/episode, and app/source context when reported by the media player.
+- Added an optional Playback media entity per source mapping.
+- Playback media entity automatically falls back to the mapping's Apps / source entity, then to the control entity when it is a media player.
+- Added a visual-editor toggle for Now Playing.
+
+
 ## v0.4.2 — 2026-09-25
 
 - Fixed the popup remote ignoring an existing TV power helper.
