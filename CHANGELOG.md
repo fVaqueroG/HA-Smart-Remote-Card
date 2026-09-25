@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.0 — 2026-09-25
+
+- Added a dedicated TV power helper / entity setting.
+- Added an optional power helper / entity to every mapped source/device.
+- Added a mapped-device power button that only appears when configured.
+- Device power state is reflected visually on the mapped-device power button.
+- Added support for media_player, switch, input_boolean, and remote power entities.
+
+
 ## v0.3.0 — 2026-09-25
 
 - Added an optional Apps / source entity to each mapped TV input.
