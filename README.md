@@ -240,6 +240,37 @@ If the media player does not report position/duration, the progress bar is simpl
 
 ## Mapped device apps and sources
 
+### Android Debug Bridge manual apps
+
+Home Assistant's Android Debug Bridge integration uses its configured application list as a package-ID-to-friendly-name mapping, but it does not expose that entire configured list in the media player's `source_list`. The entity's `source_list` is built from apps Android reports as currently/running sources.
+
+Starting with v0.6.2, each Smart Remote source mapping can therefore maintain its own **Manual apps (ADB/package IDs)** list.
+
+Each entry contains:
+
+- Friendly name, for example `Netflix`
+- Package ID, for example `com.netflix.ninja`
+
+Smart Remote merges those manual apps with live ADB sources and Browse Media applications, removes duplicates, and launches manual entries by calling `media_player.select_source` with the package ID.
+
+Example:
+
+```yaml
+mappings:
+  - source: HDMI 1
+    name: Android TV
+    type: android_tv
+    entity: remote.mitv_aesp0
+    source_entity: media_player.android_tv_192_168_31_23
+    manual_apps:
+      - name: Netflix
+        package: com.netflix.ninja
+      - name: Disney+
+        package: com.disney.disneyplus
+```
+
+This works even when the manually configured ADB app is not currently present in Home Assistant's `source_list`.
+
 ### Android TV Remote configured apps
 
 Starting with v0.6.1, Smart Remote does not rely only on `source_list` for Android TV applications.
@@ -382,7 +413,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.6.1**
+Current release: **v0.6.2**
 
 ## License
 
