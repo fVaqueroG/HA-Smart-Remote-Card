@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.2 — 2026-09-25
+
+- Added per-mapping manual app entries for Android Debug Bridge media players.
+- Manual apps use a friendly name plus Android package ID.
+- Manual apps are merged with ADB `source_list` and Browse Media applications.
+- Duplicate apps are removed by package ID or friendly name.
+- Manual ADB apps launch through `media_player.select_source` using the package ID.
+- Current app selection is matched against `app_id`, `app_name`, and source.
+- Added add/remove/edit controls for manual apps in the visual editor.
+
+
 ## v0.6.1 — 2026-09-25
 
 - Fixed Android TV Remote applications configured manually in Home Assistant not appearing in the mapped-device app selector.
