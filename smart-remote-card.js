@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.6.0";
+const SMART_REMOTE_VERSION = "0.6.1";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -30,6 +30,8 @@ const ACCENT_LABELS = {
   pink: "Pink",
   custom: "Custom",
 };
+
+const MEDIA_PLAYER_FEATURE_BROWSE_MEDIA = 131072;
 
 const PRESETS = {
   android_tv: {
@@ -111,6 +113,8 @@ class SmartRemoteCard extends HTMLElement {
     this._tab = "nav";
     this._lastSource = undefined;
     this._progressTimer = null;
+    this._browseApps = new Map();
+    this._browseAppsLoading = new Set();
   }
 
   static getConfigElement() { return document.createElement("smart-remote-card-editor"); }
@@ -159,6 +163,7 @@ class SmartRemoteCard extends HTMLElement {
     this._hass = hass;
     const source = this._currentSource();
     if (source !== this._lastSource) this._lastSource = source;
+    this._ensureBrowseApps(this._activeMapping());
     this.render();
   }
 
@@ -320,10 +325,99 @@ class SmartRemoteCard extends HTMLElement {
     return this._deviceSourceState(route)?.attributes?.source ?? "";
   }
 
-  async _selectDeviceSource(source) {
+  async _ensureBrowseApps(route = this._activeMapping()) {
+    const entity = this._deviceSourceEntity(route);
+    if (!this._hass || !entity || this._browseAppsLoading.has(entity)) return;
+
+    const cached = this._browseApps.get(entity);
+    if (cached && Date.now() - cached.fetchedAt < 60000) return;
+
+    const state = this._hass.states?.[entity];
+    const supported = Number(state?.attributes?.supported_features || 0);
+    if (!(supported & MEDIA_PLAYER_FEATURE_BROWSE_MEDIA)) {
+      this._browseApps.set(entity, { apps: [], fetchedAt: Date.now() });
+      return;
+    }
+
+    this._browseAppsLoading.add(entity);
+    try {
+      const root = await this._hass.callWS({
+        type: "media_player/browse_media",
+        entity_id: entity,
+      });
+      const children = Array.isArray(root?.children) ? root.children : [];
+      const apps = children
+        .filter(item => item?.media_content_id && (item.media_content_type === "app" || item.media_class === "app"))
+        .map(item => ({
+          id: String(item.media_content_id),
+          type: String(item.media_content_type || "app"),
+          label: String(item.title || item.media_content_id),
+        }))
+        .sort((a,b) => a.label.localeCompare(b.label));
+      this._browseApps.set(entity, { apps, fetchedAt: Date.now() });
+    } catch (_err) {
+      this._browseApps.set(entity, { apps: [], fetchedAt: Date.now() });
+    } finally {
+      this._browseAppsLoading.delete(entity);
+      if (entity === this._deviceSourceEntity()) this.render();
+    }
+  }
+
+  _deviceSourceOptions(route = this._activeMapping()) {
+    const entity = this._deviceSourceEntity(route);
+    const state = this._deviceSourceState(route);
+    const sourceList = this._deviceSourceList(route);
+    const currentSource = state?.attributes?.source ?? "";
+    const currentAppId = state?.attributes?.app_id ?? "";
+    const currentAppName = state?.attributes?.app_name ?? "";
+
+    const sources = sourceList.map(value => ({
+      kind: "source",
+      id: String(value),
+      label: String(value),
+      selected: String(value) === String(currentSource),
+    }));
+
+    const seenLabels = new Set(sources.map(item => norm(item.label)));
+    const seenIds = new Set(sources.map(item => norm(item.id)));
+    const browseApps = this._browseApps.get(entity)?.apps || [];
+    const apps = [];
+
+    for (const app of browseApps) {
+      if (seenLabels.has(norm(app.label)) || seenIds.has(norm(app.id))) continue;
+      apps.push({
+        kind: "app",
+        id: app.id,
+        type: app.type || "app",
+        label: app.label,
+        selected:
+          String(app.id) === String(currentAppId) ||
+          String(app.label) === String(currentAppName) ||
+          String(app.label) === String(currentSource) ||
+          String(app.id) === String(currentSource),
+      });
+    }
+
+    return { sources, apps };
+  }
+
+  async _selectDeviceSource(selection) {
     const route = this._activeMapping();
     const entity = this._deviceSourceEntity(route);
-    if (!entity || !source) return;
+    if (!entity || !selection) return;
+
+    if (selection.startsWith("app::")) {
+      const appId = selection.slice(5);
+      const app = (this._browseApps.get(entity)?.apps || []).find(item => item.id === appId);
+      return this._call("media_player", "play_media", {
+        media: {
+          media_content_id: appId,
+          media_content_type: app?.type || "app",
+        },
+      }, entity);
+    }
+
+    const source = selection.startsWith("source::") ? selection.slice(8) : selection;
     return this._call("media_player", "select_source", { source }, entity);
   }
 
@@ -469,10 +563,14 @@ class SmartRemoteCard extends HTMLElement {
       ? `<select id="source-select" aria-label="TV source">${sources.map(s => `<option value="${esc(s)}" ${String(s) === String(source) ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>`
       : "";
 
-    const deviceSources = this._deviceSourceList(route);
-    const currentDeviceSource = this._currentDeviceSource(route);
-    const deviceSourceSelector = this._config.show_device_source_selector !== false && deviceSources.length
-      ? `<select id="device-source-select" aria-label="${esc(this._routeName(route))} app or source">${deviceSources.map(s => `<option value="${esc(s)}" ${String(s) === String(currentDeviceSource) ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>`
+    this._ensureBrowseApps(route);
+    const deviceOptions = this._deviceSourceOptions(route);
+    const hasDeviceOptions = deviceOptions.sources.length || deviceOptions.apps.length;
+    const deviceSourceSelector = this._config.show_device_source_selector !== false && hasDeviceOptions
+      ? `<select id="device-source-select" aria-label="${esc(this._routeName(route))} app or source">
+          ${deviceOptions.sources.length ? `<optgroup label="Sources">${deviceOptions.sources.map(item => `<option value="source::${esc(item.id)}" ${item.selected ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</optgroup>` : ""}
+          ${deviceOptions.apps.length ? `<optgroup label="Apps">${deviceOptions.apps.map(item => `<option value="app::${esc(item.id)}" ${item.selected ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</optgroup>` : ""}
+        </select>`
       : "";
     const devicePowerState = this._devicePowerState(route);
     const devicePowerOn = Boolean(devicePowerState && !["off","standby","unavailable","unknown"].includes(devicePowerState.state));
