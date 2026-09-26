@@ -240,6 +240,30 @@ If the media player does not report position/duration, the progress bar is simpl
 
 ## Mapped device apps and sources
 
+### Android TV Remote configured apps
+
+Starting with v0.6.1, Smart Remote does not rely only on `source_list` for Android TV applications.
+
+When the selected **Apps / source entity** supports Home Assistant's Browse Media feature, Smart Remote also requests its application list using `media_player/browse_media`. This is important for the **Android TV Remote** integration because applications added under **Configure Applications List** are exposed through Browse Media rather than the media player's `source_list`.
+
+The card merges both sources automatically:
+
+- Normal `source_list` entries
+- Applications returned by Browse Media
+
+Matching applications are de-duplicated. Browse Media applications are launched with `media_player.play_media` using media type `app`.
+
+For a setup that also uses Android Debug Bridge, a useful mapping is:
+
+```yaml
+source_entity: media_player.mitv_aesp0
+media_entity: media_player.android_tv_192_168_31_23
+```
+
+This lets **Android TV Remote** provide the configured app catalog while the separate ADB media player can continue providing richer playback information if available.
+
+
+
 Version 0.3.0 adds an optional **Apps / source entity** to every TV-source mapping.
 
 This is useful when the navigation remote and the app/source entity are different. For example, an Android TV mapping can use:
@@ -358,7 +382,7 @@ The visual editor offers:
 
 ## Version
 
-Current release: **v0.6.0**
+Current release: **v0.6.1**
 
 ## License
 
