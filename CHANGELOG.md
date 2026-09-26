@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.1 — 2026-09-25
+
+- Fixed Android TV Remote applications configured manually in Home Assistant not appearing in the mapped-device app selector.
+- Smart Remote now reads supported media players through Home Assistant's `media_player/browse_media` WebSocket API.
+- Browse-media applications are merged with the entity's normal `source_list` without duplicating matching apps.
+- Android TV Remote browse-media apps launch through `media_player.play_media` using media type `app`.
+- The current Android TV app is matched using `app_id`, `app_name`, or source name.
+- Media players without Browse Media support continue using `source_list` only.
+
+
 ## v0.6.0 — 2026-09-25
 
 - Formalized Light, Dark, and System theme selection in the visual editor.
