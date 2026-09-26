@@ -1,4 +1,4 @@
-const SMART_REMOTE_VERSION = "0.6.1";
+const SMART_REMOTE_VERSION = "0.6.2";
 
 const PRESET_LABELS = {
   android_tv: "Android TV Remote",
@@ -396,8 +396,32 @@ class SmartRemoteCard extends HTMLElement {
           String(app.label) === String(currentSource) ||
           String(app.id) === String(currentSource),
       });
+      seenLabels.add(norm(app.label));
+      seenIds.add(norm(app.id));
     }
 
+    const manualApps = Array.isArray(route?.manual_apps) ? route.manual_apps : [];
+    for (const app of manualApps) {
+      const packageId = String(app?.package || "").trim();
+      if (!packageId) continue;
+      const label = String(app?.name || packageId).trim();
+      if (seenLabels.has(norm(label)) || seenIds.has(norm(packageId))) continue;
+      apps.push({
+        kind: "manual_app",
+        id: packageId,
+        type: "adb",
+        label,
+        selected:
+          packageId === String(currentAppId) ||
+          label === String(currentAppName) ||
+          label === String(currentSource) ||
+          packageId === String(currentSource),
+      });
+      seenLabels.add(norm(label));
+      seenIds.add(norm(packageId));
+    }
+
+    apps.sort((a,b) => a.label.localeCompare(b.label));
     return { sources, apps };
   }
 
@@ -410,11 +434,14 @@ class SmartRemoteCard extends HTMLElement {
       const appId = selection.slice(5);
       const app = (this._browseApps.get(entity)?.apps || []).find(item => item.id === appId);
       return this._call("media_player", "play_media", {
-        media: {
-          media_content_id: appId,
-          media_content_type: app?.type || "app",
-        },
+        media_content_id: appId,
+        media_content_type: app?.type || "app",
       }, entity);
+    }
+
+    if (selection.startsWith("adbapp::")) {
+      const packageId = selection.slice(8);
+      return this._call("media_player", "select_source", { source: packageId }, entity);
     }
 
     const source = selection.startsWith("source::") ? selection.slice(8) : selection;
@@ -569,7 +596,7 @@ class SmartRemoteCard extends HTMLElement {
     const deviceSourceSelector = this._config.show_device_source_selector !== false && hasDeviceOptions
       ? `<select id="device-source-select" aria-label="${esc(this._routeName(route))} app or source">
           ${deviceOptions.sources.length ? `<optgroup label="Sources">${deviceOptions.sources.map(item => `<option value="source::${esc(item.id)}" ${item.selected ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</optgroup>` : ""}
-          ${deviceOptions.apps.length ? `<optgroup label="Apps">${deviceOptions.apps.map(item => `<option value="app::${esc(item.id)}" ${item.selected ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</optgroup>` : ""}
+          ${deviceOptions.apps.length ? `<optgroup label="Apps">${deviceOptions.apps.map(item => `<option value="${item.kind === "manual_app" ? "adbapp::" : "app::"}${esc(item.id)}" ${item.selected ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</optgroup>` : ""}
         </select>`
       : "";
     const devicePowerState = this._devicePowerState(route);
@@ -761,7 +788,39 @@ class SmartRemoteCardEditor extends HTMLElement {
     const sources = this._hass?.states?.[next.display_entity]?.attributes?.source_list || [];
     const used = new Set(next.mappings.map(m => m.source));
     const source = sources.find(s => !used.has(s)) || "HDMI 1";
-    next.mappings.push({ source, name: "", type: "android_tv", entity: "", source_entity: "", media_entity: "", power_entity: "" });
+    next.mappings.push({ source, name: "", type: "android_tv", entity: "", source_entity: "", media_entity: "", power_entity: "", manual_apps: [] });
+    this._fire(next);
+    this.render();
+  }
+
+  _addManualApp(index) {
+    const next = clone(this._config);
+    const mapping = { ...(next.mappings[index] || {}) };
+    const apps = Array.isArray(mapping.manual_apps) ? [...mapping.manual_apps] : [];
+    apps.push({ name: "", package: "" });
+    mapping.manual_apps = apps;
+    next.mappings[index] = mapping;
+    this._fire(next);
+    this.render();
+  }
+
+  _updateManualApp(index, appIndex, key, value) {
+    const next = clone(this._config);
+    const mapping = { ...(next.mappings[index] || {}) };
+    const apps = Array.isArray(mapping.manual_apps) ? [...mapping.manual_apps] : [];
+    apps[appIndex] = { ...(apps[appIndex] || {}), [key]: value };
+    mapping.manual_apps = apps;
+    next.mappings[index] = mapping;
+    this._fire(next);
+  }
+
+  _removeManualApp(index, appIndex) {
+    const next = clone(this._config);
+    const mapping = { ...(next.mappings[index] || {}) };
+    const apps = Array.isArray(mapping.manual_apps) ? [...mapping.manual_apps] : [];
+    apps.splice(appIndex, 1);
+    mapping.manual_apps = apps;
+    next.mappings[index] = mapping;
     this._fire(next);
     this.render();
   }
@@ -789,7 +848,7 @@ class SmartRemoteCardEditor extends HTMLElement {
     const mappings = c.mappings || [];
     this.shadowRoot.innerHTML = `
       <style>
-        :host{display:block;color:var(--primary-text-color)}*{box-sizing:border-box}h3{margin:20px 0 8px;font-size:15px}p.help{margin:0 0 10px;color:var(--secondary-text-color);font-size:12px;line-height:1.4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}label{font-size:11px;color:var(--secondary-text-color)}input,select{width:100%;min-width:0;height:40px;padding:0 10px;border:1px solid var(--divider-color);border-radius:10px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{display:flex;align-items:center;gap:8px;font-size:13px}.check input{width:auto;height:auto}.mapping{padding:12px;margin:10px 0;border:1px solid var(--divider-color);border-radius:14px;background:var(--secondary-background-color)}.mapping-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.mapping-title{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.map-actions{display:flex;gap:4px}.small{width:32px;height:32px;border:0;border-radius:9px;background:var(--card-background-color);color:var(--primary-text-color);cursor:pointer}.small.danger{color:var(--error-color)}.add{width:100%;height:42px;border:1px dashed var(--primary-color);border-radius:12px;background:transparent;color:var(--primary-color);font-weight:700;cursor:pointer}.version{margin-top:18px;font-size:10px;color:var(--secondary-text-color);text-align:right}@media(max-width:520px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.checks{grid-template-columns:1fr}}
+        :host{display:block;color:var(--primary-text-color)}*{box-sizing:border-box}h3{margin:20px 0 8px;font-size:15px}p.help{margin:0 0 10px;color:var(--secondary-text-color);font-size:12px;line-height:1.4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}label{font-size:11px;color:var(--secondary-text-color)}input,select{width:100%;min-width:0;height:40px;padding:0 10px;border:1px solid var(--divider-color);border-radius:10px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{display:flex;align-items:center;gap:8px;font-size:13px}.check input{width:auto;height:auto}.mapping{padding:12px;margin:10px 0;border:1px solid var(--divider-color);border-radius:14px;background:var(--secondary-background-color)}.mapping-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.mapping-title{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.map-actions{display:flex;gap:4px}.small{width:32px;height:32px;border:0;border-radius:9px;background:var(--card-background-color);color:var(--primary-text-color);cursor:pointer}.small.danger{color:var(--error-color)}.add{width:100%;height:42px;border:1px dashed var(--primary-color);border-radius:12px;background:transparent;color:var(--primary-color);font-weight:700;cursor:pointer}.manual-apps{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--divider-color)}.manual-app-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.manual-app-head span{font-size:11px;color:var(--secondary-text-color)}.manual-app-add{height:32px;padding:0 10px;border:1px dashed var(--primary-color);border-radius:9px;background:transparent;color:var(--primary-color);font-weight:600;cursor:pointer}.manual-app-row{display:grid;grid-template-columns:1fr 1.4fr 32px;gap:6px;align-items:end}.manual-app-row .field{min-width:0}.manual-app-remove{width:32px;height:40px;border:0;border-radius:9px;background:var(--card-background-color);color:var(--error-color);cursor:pointer}.version{margin-top:18px;font-size:10px;color:var(--secondary-text-color);text-align:right}@media(max-width:520px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.checks{grid-template-columns:1fr}}
       </style>
       <h3>Display</h3>
       <p class="help">The display's current source chooses which mapped device receives remote commands.</p>
@@ -832,6 +891,14 @@ class SmartRemoteCardEditor extends HTMLElement {
             <div class="field full"><label>Apps / source entity (optional)</label><select data-map="source_entity">${this._entityOptions(m.source_entity || (m.type === "media_player" ? m.entity : ""),["media_player"])}</select></div>
             <div class="field full"><label>Playback media entity (optional)</label><select data-map="media_entity">${this._entityOptions(m.media_entity || m.source_entity || (m.type === "media_player" ? m.entity : ""),["media_player"])}</select></div>
             <div class="field full"><label>Device power helper / entity (optional)</label><select data-map="power_entity">${this._entityOptions(m.power_entity || "",["media_player","switch","input_boolean","remote"])}</select></div>
+            <div class="manual-apps">
+              <div class="manual-app-head"><span>Manual apps (ADB / package IDs)</span><button type="button" class="manual-app-add" data-add-manual-app>+ Add app</button></div>
+              ${(Array.isArray(m.manual_apps) ? m.manual_apps : []).map((app,appIndex) => `<div class="manual-app-row" data-app-index="${appIndex}">
+                <div class="field"><label>App name</label><input data-manual-app="name" value="${esc(app?.name || "")}" placeholder="Netflix"></div>
+                <div class="field"><label>Package ID</label><input data-manual-app="package" value="${esc(app?.package || "")}" placeholder="com.netflix.ninja"></div>
+                <button type="button" class="manual-app-remove" data-remove-manual-app title="Remove app">×</button>
+              </div>`).join("")}
+            </div>
           </div>
         </div>`;
       }).join("")}</div>
@@ -864,6 +931,12 @@ class SmartRemoteCardEditor extends HTMLElement {
       box.querySelectorAll("[data-map]").forEach(el => el.addEventListener(el.tagName === "INPUT" ? "input" : "change", e => { this._update(["mapping",index,el.dataset.map], e.target.value); if (el.dataset.map === "type") this.render(); }));
       box.querySelector("[data-remove]")?.addEventListener("click", () => this._removeMapping(index));
       box.querySelectorAll("[data-move]").forEach(btn => btn.addEventListener("click", () => this._moveMapping(index, Number(btn.dataset.move))));
+      box.querySelector("[data-add-manual-app]")?.addEventListener("click", () => this._addManualApp(index));
+      box.querySelectorAll(".manual-app-row").forEach(row => {
+        const appIndex = Number(row.dataset.appIndex);
+        row.querySelectorAll("[data-manual-app]").forEach(el => el.addEventListener("input", e => this._updateManualApp(index, appIndex, el.dataset.manualApp, e.target.value)));
+        row.querySelector("[data-remove-manual-app]")?.addEventListener("click", () => this._removeManualApp(index, appIndex));
+      });
     });
     this.shadowRoot.querySelectorAll("[data-fallback]").forEach(el => el.addEventListener(el.tagName === "INPUT" ? "input" : "change", e => { this._update(["fallback",el.dataset.fallback], e.target.value); if (el.dataset.fallback === "type") this.render(); }));
     this.shadowRoot.getElementById("add-mapping")?.addEventListener("click", () => this._addMapping());
